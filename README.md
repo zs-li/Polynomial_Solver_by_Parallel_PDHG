@@ -2,38 +2,56 @@
 
 This repository is a solver for Polynomial Optimization of the following form:
 
-
 ```math
+\begin{align}
     \min _{\mathbf{P}(t)} \int_{0}^T \mathbf{P}(t)^{\top} \boldsymbol{\Sigma} \mathbf{P}(t)& +\mathbf{\mu}(t)^\top \mathbf{P}(t) {\rm d} t \\
     \text { s.t. } \quad L_{k} \mathbf{P}(t)-b_{k} &  \geq 0 ,\ t\in[0,T],\ k=1, \cdots, N_{\text{ineq }} \\
     S_{ k} \mathbf{P}(t_k)-h_{k} & =0,\ k=1, \cdots, N_{\text{eq }}
+\end{align}
 ```
 
-where $\bm{P}(t)$ is the polynomial vector of the following form
+where $\mathbf{P}(t)$ is the polynomial vector of the following form
 
 ```math
-\bm{p}(t)=\begin{matrix}
+\mathbf{p}(t)=\begin{matrix}
 			\begin{bmatrix} p_1(t) \\ \vdots \\ p_m(t) \end{bmatrix}
 		\end{matrix},\
 		\mathbf{P}(t)=\begin{bmatrix} \mathbf{p}^{(0)}(t) \\ \vdots \\ \mathbf{p}^{(s)}(t)\end{bmatrix}
 ```
 
-with $p_i(t)$ as a polynomial with one variable and maximum degree $d$. $\mathbf{p}^{(s)}(t)$ is $s$-th order derivative of $\mathbf{p}(t)$.
+with $p_i(t)$ as a polynomial with one variable $t$ and maximum degree $d$. $\mathbf{p}^{(s)}(t)$ is $s$-th order derivative of $\mathbf{p}(t)$.
 $N_{\rm ineq}$ and $N_{\rm eq}$ are number of polynomial inequality and equality constraints.
-$\mu(t):\mathbb{R}\rightarrow\mathbb{R}^m$ is a known function and only vector of polynomials are supported for now.
+$\mu(t):\mathbb{R}\rightarrow\mathbb{R}^{m(s+1)}$ is a known function and only vectors of polynomials are supported for now.
 
+The solver is written in [Julia](https://julialang.org/). The example interface of our proposed solver is as follows:
+
+```julia
+model = PPPS.Model() # PPPS is Parallel PDHG Polynomial Solver
+@variable(model, p, dim=m, deg=s, seg=N)# polynomial variable
+for k in 1:Nineq
+    @ineqconstraint(model, Lk, bk,T ) # poly ineq parameters
+end
+for k in 1:Neq
+    @eqconstraint(model, Sk, hk, tk)# poly eq parameters
+end
+@objective(model, Min, Σ, µ) # µ is polynomial parameters 
+optimize!(model)
+```
+
+## Translating and solving process in the background
 
 This is the paper [link](https://arxiv.org/abs/2303.17889) of original work.
 
+The polynomial optimization problem is translated into an SDP problem and solved with customized primal-dual based iterations in a parallelized manner.
+This solver is originally proposed to solve a Model Predictive Control (MPC) problem of a continuous-time linear time-invariant system subject to continuous-time path constraints on the states and the inputs. By leveraging the concept of differential flatness, we can replace the differential equations governing the system with linear mapping between the states, inputs, and flat outputs (including their derivatives). The flat outputs are then parameterized by piecewise polynomials, and the model predictive control problem can be equivalently transformed into a Semi-Definite Programming (SDP) problem via Sum-of-Squares (SOS), ensuring constraint satisfaction at every continuous-time interval. We further note that the SDP problem contains a large number of small-size semi-definite matrices as optimization variables. To address this, we develop a Primal-Dual Hybrid Gradient (PDHG) algorithm that can be efficiently parallelized to speed up the optimization procedure. 
 
-In this paper, we consider a Model Predictive Control (MPC) problem of a continuous-time linear time-invariant system subject to continuous-time path constraints on the states and the inputs. By leveraging the concept of differential flatness, we can replace the differential equations governing the system with linear mapping between the states, inputs, and flat outputs (including their derivatives). The flat outputs are then parameterized by piecewise polynomials, and the model predictive control problem can be equivalently transformed into a Semi-Definite Programming (SDP) problem via Sum-of-Squares (SOS), ensuring constraint satisfaction at every continuous-time interval. We further note that the SDP problem contains a large number of small-size semi-definite matrices as optimization variables. To address this, we develop a Primal-Dual Hybrid Gradient (PDHG) algorithm that can be efficiently parallelized to speed up the optimization procedure. Simulation results on a quadruple-tank process demonstrate that our formulation can guarantee strict constraint satisfaction, while the standard MPC controller based on the discretized system may violate the constraint inside a sampling period. Moreover, the computational speed superiority of our proposed algorithm is collaborated by the simulation.
+## Example on solving continuous-time MPC problem
+
+We use the quad-tank process as an example of the usage of our solver.
 
 
-Our proposed methods provides fast computation with continuous-time constraint satisfaction guarantee. The main procedure is solving an SDP problem with customized primal-dual based iterations in a parallelized manner.
 
-The project is written in [julia](https://julialang.org/).
 
-The main test script is **quadruple_example.jl**. Please run this script for numerical simulation.
 
 ## Result
 
